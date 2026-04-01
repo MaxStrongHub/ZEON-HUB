@@ -1,6 +1,6 @@
--- ZEON HUB - Blox Fruit Fruit Finder & Auto Store & ESP
+-- ZEON HUB - Blox Fruit Ultimate Script
 -- Designed for Delta Executor
--- Updated Fruit Names
+-- Features: Flying, ESP, Auto Collect, Profile Display, Anime GUI
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -8,75 +8,125 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 local RootPart = Character:WaitForChild("HumanoidRootPart")
 
--- GUI Elements
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ZEON_HUB"
-ScreenGui.Parent = CoreGui
-ScreenGui.ResetOnSpawn = false
+-- Notify Function
+local function Notify(title, text, duration)
+    duration = duration or 3
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = title,
+        Text = text,
+        Duration = duration
+    })
+end
 
--- ESP Storage
-local ESPObjects = {}
-local ESPLines = {}
-
--- Updated Fruit List
+-- Updated Fruit List with Rarity
 local FruitModels = {
-    "ROCKET", "SPIN", "BLADE", "SPRING", "BOMB", "SMOKE", "SPIKE", "FLAME", "ICE", "SAND",
-    "DARK", "EAGLE", "DIAMOND", "LIGHT", "RUBBER", "GHOST", "MAGMA", "QUAKER", "BUDDHA",
-    "LOVE", "CREATION", "SPIDER", "SOUND", "PHOENIX", "PORTAL", "LIGHTNING", "PAIN", "BLIZZARD",
-    "GRAVITY", "MAMMOTH", "TREX", "DOUGH", "SHADOW", "VENOM", "GAS", "SPIRIT", "TIGER", "YETI", "KITSUNE"
+    ROCKET = "Common", SPIN = "Common", BLADE = "Common", SPRING = "Common", BOMB = "Common",
+    SMOKE = "Common", SPIKE = "Common", FLAME = "Uncommon", ICE = "Uncommon", SAND = "Uncommon",
+    DARK = "Uncommon", EAGLE = "Uncommon", DIAMOND = "Uncommon", LIGHT = "Uncommon", RUBBER = "Uncommon",
+    GHOST = "Uncommon", MAGMA = "Rare", QUAKER = "Rare", BUDDHA = "Rare", LOVE = "Rare",
+    CREATION = "Rare", SPIDER = "Rare", SOUND = "Rare", PHOENIX = "Rare", PORTAL = "Legendary",
+    LIGHTNING = "Legendary", PAIN = "Legendary", BLIZZARD = "Legendary", GRAVITY = "Legendary",
+    MAMMOTH = "Legendary", TREX = "Legendary", DOUGH = "Mythical", SHADOW = "Mythical", VENOM = "Mythical",
+    GAS = "Mythical", SPIRIT = "Mythical", TIGER = "Mythical", YETI = "Mythical", KITSUNE = "Mythical"
 }
 
--- Fruit Rarity Colors
 local FruitColors = {
-    Common = Color3.fromRGB(150, 150, 150),
-    Uncommon = Color3.fromRGB(0, 255, 0),
-    Rare = Color3.fromRGB(0, 150, 255),
-    Legendary = Color3.fromRGB(255, 100, 0),
+    Common = Color3.fromRGB(120, 120, 120),
+    Uncommon = Color3.fromRGB(0, 200, 0),
+    Rare = Color3.fromRGB(0, 120, 255),
+    Legendary = Color3.fromRGB(255, 120, 0),
     Mythical = Color3.fromRGB(255, 50, 200)
 }
-
-local function GetFruitRarity(fruitName)
-    local common = {"ROCKET", "SPIN", "BLADE", "SPRING", "BOMB", "SMOKE", "SPIKE"}
-    local uncommon = {"FLAME", "ICE", "SAND", "DARK", "EAGLE", "DIAMOND", "LIGHT", "RUBBER", "GHOST"}
-    local rare = {"MAGMA", "QUAKER", "BUDDHA", "LOVE", "CREATION", "SPIDER", "SOUND", "PHOENIX"}
-    local legendary = {"PORTAL", "LIGHTNING", "PAIN", "BLIZZARD", "GRAVITY", "MAMMOTH", "TREX", "DOUGH"}
-    local mythical = {"SHADOW", "VENOM", "GAS", "SPIRIT", "TIGER", "YETI", "KITSUNE"}
-    
-    if table.find(common, fruitName) then return "Common", FruitColors.Common
-    elseif table.find(uncommon, fruitName) then return "Uncommon", FruitColors.Uncommon
-    elseif table.find(rare, fruitName) then return "Rare", FruitColors.Rare
-    elseif table.find(legendary, fruitName) then return "Legendary", FruitColors.Legendary
-    elseif table.find(mythical, fruitName) then return "Mythical", FruitColors.Mythical
-    else return "Unknown", Color3.fromRGB(255, 255, 255) end
-end
 
 -- Settings
 local Settings = {
     Enabled = false,
     AutoStore = false,
-    FlySpeed = 300,
+    FlySpeed = 250,
     ESPEnabled = true,
     CurrentTarget = nil,
     Fruits = {}
 }
 
+-- ESP Storage
+local ESPObjects = {}
+
+-- Flying Variables
+local FlyEnabled = false
+local BodyVelocity = Instance.new("BodyVelocity")
+BodyVelocity.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+
+local BodyGyro = Instance.new("BodyGyro")
+BodyGyro.MaxTorque = Vector3.new(1/0, 1/0, 1/0)
+BodyGyro.P = 10000
+
+local function EnableFly()
+    FlyEnabled = true
+    BodyVelocity.Parent = RootPart
+    BodyGyro.Parent = RootPart
+    Humanoid.PlatformStand = true
+end
+
+local function DisableFly()
+    FlyEnabled = false
+    BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    BodyVelocity.Parent = nil
+    BodyGyro.Parent = nil
+    Humanoid.PlatformStand = false
+end
+
+local function FlyTo(position)
+    if not FlyEnabled then return false end
+    
+    local direction = (position - RootPart.Position).unit
+    local distance = (RootPart.Position - position).magnitude
+    local speed = Settings.FlySpeed
+    
+    if distance < 5 then
+        BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        return true
+    end
+    
+    local velocity = direction * math.min(speed, distance * 1.2)
+    BodyVelocity.Velocity = velocity
+    
+    -- Face target
+    BodyGyro.CFrame = CFrame.new(RootPart.Position, position)
+    
+    -- Auto height adjustment
+    local yDiff = position.Y - RootPart.Position.Y
+    if math.abs(yDiff) > 3 then
+        BodyVelocity.Velocity = BodyVelocity.Velocity + Vector3.new(0, yDiff > 0 and speed * 0.5 or -speed * 0.3, 0)
+    end
+    
+    return false
+end
+
 -- ESP Functions
-local function CreateESP(fruitModel, fruitName, rarityColor)
+local function GetFruitRarity(fruitName)
+    local rarity = FruitModels[fruitName] or "Common"
+    return rarity, FruitColors[rarity]
+end
+
+local function CreateESP(fruitModel, fruitName)
     if ESPObjects[fruitModel] then return end
     
     local handle = fruitModel:FindFirstChild("Handle")
     if not handle then return end
     
+    local rarity, color = GetFruitRarity(fruitName)
+    
     -- Billboard GUI
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "FruitESP"
-    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.Size = UDim2.new(0, 180, 0, 55)
     billboard.StudsOffset = Vector3.new(0, 3, 0)
     billboard.AlwaysOnTop = true
     billboard.Parent = handle
@@ -84,7 +134,7 @@ local function CreateESP(fruitModel, fruitName, rarityColor)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(1, 0, 1, 0)
     frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    frame.BackgroundTransparency = 0.5
+    frame.BackgroundTransparency = 0.4
     frame.BorderSizePixel = 0
     frame.Parent = billboard
     
@@ -97,7 +147,7 @@ local function CreateESP(fruitModel, fruitName, rarityColor)
     nameLabel.Position = UDim2.new(0, 0, 0, 0)
     nameLabel.BackgroundTransparency = 1
     nameLabel.Text = fruitName
-    nameLabel.TextColor3 = rarityColor
+    nameLabel.TextColor3 = color
     nameLabel.TextScaled = true
     nameLabel.Font = Enum.Font.GothamBold
     nameLabel.TextStrokeTransparency = 0.3
@@ -107,29 +157,30 @@ local function CreateESP(fruitModel, fruitName, rarityColor)
     rarityLabel.Size = UDim2.new(1, 0, 0.4, 0)
     rarityLabel.Position = UDim2.new(0, 0, 0.6, 0)
     rarityLabel.BackgroundTransparency = 1
-    rarityLabel.Text = GetFruitRarity(fruitName)
-    rarityLabel.TextColor3 = rarityColor
+    rarityLabel.Text = rarity
+    rarityLabel.TextColor3 = color
     rarityLabel.TextScaled = true
     rarityLabel.Font = Enum.Font.Gotham
-    rarityLabel.TextTransparency = 0.3
+    rarityLabel.TextTransparency = 0.2
     rarityLabel.Parent = frame
     
-    -- Outline Box
+    -- Box Outline
     local box = Instance.new("BoxHandleAdornment")
     box.Name = "FruitBox"
     box.Size = handle.Size + Vector3.new(2, 2, 2)
     box.Adornee = handle
-    box.Color3 = rarityColor
-    box.Transparency = 0.4
+    box.Color3 = color
+    box.Transparency = 0.3
     box.ZIndex = 10
     box.AlwaysOnTop = true
     box.Parent = handle
     
-    -- Store ESP data
     ESPObjects[fruitModel] = {
         Billboard = billboard,
         Box = box,
-        Handle = handle
+        Handle = handle,
+        Name = fruitName,
+        Rarity = rarity
     }
 end
 
@@ -149,11 +200,11 @@ local function ClearAllESP()
     ESPObjects = {}
 end
 
--- Scan for fruits with ESP
+-- Scan Fruits
 local function ScanForFruits()
     local fruits = {}
     for _, v in ipairs(workspace:GetDescendants()) do
-        if v:IsA("Model") and v:FindFirstChild("Handle") and table.find(FruitModels, v.Name) then
+        if v:IsA("Model") and v:FindFirstChild("Handle") and FruitModels[v.Name] then
             local position = v:FindFirstChild("Handle").Position
             local distance = (RootPart.Position - position).magnitude
             local rarity, color = GetFruitRarity(v.Name)
@@ -167,16 +218,15 @@ local function ScanForFruits()
                 Color = color
             })
             
-            -- Create ESP if enabled
             if Settings.ESPEnabled then
-                CreateESP(v, v.Name, color)
+                CreateESP(v, v.Name)
             end
         end
     end
     
-    -- Clean up ESP for destroyed fruits
+    -- Cleanup destroyed fruits
     for fruitModel, _ in pairs(ESPObjects) do
-        if not fruitModel.Parent or not fruitModel:FindFirstChild("Handle") or not table.find(FruitModels, fruitModel.Name) then
+        if not fruitModel.Parent or not fruitModel:FindFirstChild("Handle") or not FruitModels[fruitModel.Name] then
             RemoveESP(fruitModel)
         end
     end
@@ -185,77 +235,61 @@ local function ScanForFruits()
     return fruits
 end
 
--- Flying Mechanism
-local FlyEnabled = false
-local BodyVelocity = Instance.new("BodyVelocity")
-BodyVelocity.MaxForce = Vector3.new(1/0, 1/0, 1/0)
-
-local function SetupFly()
-    BodyVelocity.Parent = RootPart
-    BodyVelocity.Velocity = Vector3.new(0, 0, 0)
-end
-
-local function FlyTo(position)
-    if not FlyEnabled then return end
-    local direction = (position - RootPart.Position).unit
-    local distance = (position - RootPart.Position).magnitude
-    local speed = Settings.FlySpeed
-    
-    if distance < 8 then
-        BodyVelocity.Velocity = Vector3.new(0, 0, 0)
-        return true
-    end
-    
-    local velocity = direction * math.min(speed, distance * 1.5)
-    BodyVelocity.Velocity = velocity
-    
-    -- Auto Y adjustment
-    local yDiff = position.Y - RootPart.Position.Y
-    if yDiff > 5 then
-        BodyVelocity.Velocity = BodyVelocity.Velocity + Vector3.new(0, speed * 0.6, 0)
-    elseif yDiff < -5 then
-        BodyVelocity.Velocity = BodyVelocity.Velocity - Vector3.new(0, speed * 0.4, 0)
-    end
-    
-    return false
-end
-
 -- Auto Store
 local function AutoStoreFruit(fruitModel)
     if not Settings.AutoStore then return end
     
     local tool = fruitModel:FindFirstChildOfClass("Tool")
     if tool and tool.Parent == fruitModel then
-        local args = {
-            [1] = "Store",
-            [2] = tool
-        }
-        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
+        local remote = ReplicatedStorage:FindFirstChild("Remotes")
         if remote then
             local storeRemote = remote:FindFirstChild("StoreFruit")
             if storeRemote then
-                storeRemote:InvokeServer(unpack(args))
-                wait(0.3)
+                storeRemote:InvokeServer("Store", tool)
+                Notify("ZEON HUB", "Fruit stored: " .. fruitModel.Name, 2)
             end
         end
     end
 end
 
--- Main Loop
-local function FindAndCollect()
+-- Collect Fruit with Notification
+local function CollectFruit(fruitModel)
+    local tool = fruitModel:FindFirstChildOfClass("Tool")
+    if tool then
+        local remote = ReplicatedStorage:FindFirstChild("Remotes")
+        if remote then
+            local collectRemote = remote:FindFirstChild("CollectFruit")
+            if collectRemote then
+                collectRemote:InvokeServer("Collect", tool)
+                Notify("🍎 FRUIT FOUND!", "Collected: " .. fruitModel.Name .. " [" .. (FruitModels[fruitModel.Name] or "Common") .. "]", 3)
+                wait(0.3)
+                AutoStoreFruit(fruitModel)
+                RemoveESP(fruitModel)
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- Main Auto Farm Loop
+local function AutoCollectLoop()
     while Settings.Enabled do
         local fruits = ScanForFruits()
+        
         if #fruits > 0 then
             local target = fruits[1]
             Settings.CurrentTarget = target.Model
             
-            -- Fly to fruit
-            FlyEnabled = true
-            SetupFly()
+            -- Notify when fruit detected
+            Notify("🎯 TARGET DETECTED", target.Name .. " [" .. target.Rarity .. "] - " .. math.floor(target.Distance) .. "m away", 2)
+            
+            -- Enable fly and go to fruit
+            EnableFly()
             
             local reached = false
-            local timeout = 0
-            while not reached and Settings.Enabled and target.Model and target.Model.Parent == workspace and timeout < 30 do
+            local attempts = 0
+            while not reached and Settings.Enabled and target.Model and target.Model.Parent == workspace and attempts < 50 do
                 local currentPos = target.Model:FindFirstChild("Handle")
                 if currentPos then
                     reached = FlyTo(currentPos.Position)
@@ -263,31 +297,14 @@ local function FindAndCollect()
                     break
                 end
                 RunService.RenderStepped:Wait()
-                timeout = timeout + 0.1
+                attempts = attempts + 1
             end
             
-            FlyEnabled = false
-            BodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            DisableFly()
             
             -- Collect fruit
             if target.Model and target.Model.Parent == workspace then
-                local tool = target.Model:FindFirstChildOfClass("Tool")
-                if tool then
-                    local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                    if remote then
-                        local collectRemote = remote:FindFirstChild("CollectFruit")
-                        if collectRemote then
-                            local args = {
-                                [1] = "Collect",
-                                [2] = tool
-                            }
-                            collectRemote:InvokeServer(unpack(args))
-                            wait(0.3)
-                            AutoStoreFruit(target.Model)
-                        end
-                    end
-                end
-                RemoveESP(target.Model)
+                CollectFruit(target.Model)
             end
             
             Settings.CurrentTarget = nil
@@ -299,7 +316,7 @@ local function FindAndCollect()
 end
 
 -- ESP Update Loop
-local function ESPUpdateLoop()
+coroutine.wrap(function()
     while true do
         if Settings.ESPEnabled then
             for fruitModel, data in pairs(ESPObjects) do
@@ -310,459 +327,652 @@ local function ESPUpdateLoop()
         end
         wait(0.1)
     end
+end)()
+
+-- Get Player Stats
+local function GetPlayerStats()
+    local stats = {
+        Username = LocalPlayer.Name,
+        DisplayName = LocalPlayer.DisplayName,
+        UserId = LocalPlayer.UserId,
+        Level = 0,
+        Melee = "None",
+        Fruit = "None",
+        Gun = "None",
+        Sword = "None"
+    }
+    
+    -- Get Thumbnail
+    local thumbnail = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
+    
+    -- Get stats from game
+    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+    if leaderstats then
+        local level = leaderstats:FindFirstChild("Level")
+        if level then stats.Level = level.Value end
+    end
+    
+    -- Get equipped items
+    local equipment = LocalPlayer:FindFirstChild("Data") and LocalPlayer.Data:FindFirstChild("Equipment")
+    if equipment then
+        stats.Melee = equipment:FindFirstChild("Melee") and equipment.Melee.Value or "None"
+        stats.Fruit = equipment:FindFirstChild("Fruit") and equipment.Fruit.Value or "None"
+        stats.Gun = equipment:FindFirstChild("Gun") and equipment.Gun.Value or "None"
+        stats.Sword = equipment:FindFirstChild("Sword") and equipment.Sword.Value or "None"
+    end
+    
+    return stats, thumbnail
 end
 
-coroutine.wrap(ESPUpdateLoop)()
+-- Anime Style GUI with Particles
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ZEON_HUB"
+ScreenGui.Parent = CoreGui
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- Anime Style GUI Creation
-local function CreateMainGUI()
-    -- Background Blur
-    local blur = Instance.new("BlurEffect")
-    blur.Parent = Lighting
-    blur.Size = 0
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 420, 0, 580)
+MainFrame.Position = UDim2.new(0.5, -210, 0.5, -290)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 8, 25)
+MainFrame.BackgroundTransparency = 0.05
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+-- Skew/Rotation Effect
+local rotation = 0
+local targetRotation = -3
+RunService.RenderStepped:Connect(function()
+    rotation = rotation + (targetRotation - rotation) * 0.1
+    MainFrame.Rotation = rotation
+end)
+
+-- Corner
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 24)
+corner.Parent = MainFrame
+
+-- Particle System (Stars)
+local ParticleContainer = Instance.new("Frame")
+ParticleContainer.Size = UDim2.new(1, 0, 1, 0)
+ParticleContainer.BackgroundTransparency = 1
+ParticleContainer.Parent = MainFrame
+
+local particles = {}
+for i = 1, 30 do
+    local star = Instance.new("ImageLabel")
+    star.Size = UDim2.new(0, math.random(2, 5), 0, math.random(2, 5))
+    star.Position = UDim2.new(math.random(), 0, math.random(), 0)
+    star.BackgroundTransparency = 1
+    star.Image = "rbxassetid://6031090995"
+    star.ImageColor3 = Color3.fromRGB(255, 200, 100)
+    star.ImageTransparency = math.random(30, 70) / 100
+    star.Parent = ParticleContainer
     
-    -- Main Frame
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Size = UDim2.new(0, 480, 0, 650)
-    MainFrame.Position = UDim2.new(0.5, -240, 0.5, -325)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(8, 6, 18)
-    MainFrame.BackgroundTransparency = 0.1
-    MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
-    MainFrame.Parent = ScreenGui
+    local speedX = (math.random() - 0.5) * 0.5
+    local speedY = (math.random() - 0.5) * 0.3 - 0.2
     
-    -- Corner
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 24)
-    corner.Parent = MainFrame
-    
-    -- Gradient Overlay
-    local gradient = Instance.new("UIGradient")
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 20, 60)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 8, 25))
-    })
-    gradient.Rotation = 45
-    gradient.Parent = MainFrame
-    
-    -- Glow Border
-    local glowBorder = Instance.new("ImageLabel")
-    glowBorder.Size = UDim2.new(1, 8, 1, 8)
-    glowBorder.Position = UDim2.new(0, -4, 0, -4)
-    glowBorder.BackgroundTransparency = 1
-    glowBorder.Image = "rbxassetid://5028857084"
-    glowBorder.ImageColor3 = Color3.fromRGB(150, 80, 255)
-    glowBorder.ImageTransparency = 0.6
-    glowBorder.ScaleType = Enum.ScaleType.Slice
-    glowBorder.Parent = MainFrame
-    
-    -- Header with Anime Style
-    local Header = Instance.new("Frame")
-    Header.Size = UDim2.new(1, 0, 0, 90)
-    Header.BackgroundColor3 = Color3.fromRGB(25, 18, 45)
-    Header.BorderSizePixel = 0
-    Header.Parent = MainFrame
-    
-    local headerCorner = Instance.new("UICorner")
-    headerCorner.CornerRadius = UDim.new(0, 24)
-    headerCorner.Parent = Header
-    
-    local headerGradient = Instance.new("UIGradient")
-    headerGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 50, 150)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 25, 80))
-    })
-    headerGradient.Rotation = 90
-    headerGradient.Parent = Header
-    
-    -- Logo/Title with Glow
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, 0, 1, 0)
-    Title.BackgroundTransparency = 1
-    Title.Text = "ZEON HUB"
-    Title.TextColor3 = Color3.fromRGB(255, 200, 50)
-    Title.TextScaled = true
-    Title.Font = Enum.Font.GothamBlack
-    Title.TextStrokeTransparency = 0.2
-    Title.TextStrokeColor3 = Color3.fromRGB(100, 50, 200)
-    Title.Parent = Header
-    
-    -- Subtitle
-    local SubTitle = Instance.new("TextLabel")
-    SubTitle.Size = UDim2.new(1, 0, 0, 28)
-    SubTitle.Position = UDim2.new(0, 0, 1, -28)
-    SubTitle.BackgroundTransparency = 1
-    SubTitle.Text = "FRUIT FINDER | ESP | AUTO STORE"
-    SubTitle.TextColor3 = Color3.fromRGB(200, 180, 255)
-    SubTitle.TextSize = 13
-    SubTitle.Font = Enum.Font.GothamMedium
-    SubTitle.TextTransparency = 0.2
-    SubTitle.Parent = Header
-    
-    -- Close Button
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0, 38, 0, 38)
-    CloseBtn.Position = UDim2.new(1, -48, 0, 12)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
-    CloseBtn.BackgroundTransparency = 0.2
-    CloseBtn.Text = "✕"
-    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseBtn.TextSize = 22
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.Parent = Header
-    
-    local closeCorner = Instance.new("UICorner")
-    closeCorner.CornerRadius = UDim.new(1, 0)
-    closeCorner.Parent = CloseBtn
-    
-    -- Minimize Button
-    local MinBtn = Instance.new("TextButton")
-    MinBtn.Size = UDim2.new(0, 38, 0, 38)
-    MinBtn.Position = UDim2.new(1, -96, 0, 12)
-    MinBtn.BackgroundColor3 = Color3.fromRGB(60, 55, 80)
-    MinBtn.BackgroundTransparency = 0.2
-    MinBtn.Text = "−"
-    MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    MinBtn.TextSize = 26
-    MinBtn.Font = Enum.Font.GothamBold
-    MinBtn.Parent = Header
-    
-    local minCorner = Instance.new("UICorner")
-    minCorner.CornerRadius = UDim.new(1, 0)
-    minCorner.Parent = MinBtn
-    
-    -- Content Panel
-    local Content = Instance.new("Frame")
-    Content.Size = UDim2.new(1, -40, 1, -120)
-    Content.Position = UDim2.new(0, 20, 0, 110)
-    Content.BackgroundTransparency = 1
-    Content.Parent = MainFrame
-    
-    -- Toggle Button (Enable/Disable)
-    local ToggleBtn = Instance.new("TextButton")
-    ToggleBtn.Size = UDim2.new(1, 0, 0, 60)
-    ToggleBtn.Position = UDim2.new(0, 0, 0, 10)
-    ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 45, 95)
-    ToggleBtn.Text = "⚡ START FRUIT FINDER"
-    ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ToggleBtn.TextSize = 18
-    ToggleBtn.Font = Enum.Font.GothamBold
-    ToggleBtn.Parent = Content
-    
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(0, 14)
-    toggleCorner.Parent = ToggleBtn
-    
-    -- ESP Toggle
-    local ESPToggle = Instance.new("TextButton")
-    ESPToggle.Size = UDim2.new(1, 0, 0, 55)
-    ESPToggle.Position = UDim2.new(0, 0, 0, 85)
-    ESPToggle.BackgroundColor3 = Color3.fromRGB(45, 35, 75)
-    ESPToggle.Text = "👁️ ESP: ON"
-    ESPToggle.TextColor3 = Color3.fromRGB(100, 255, 100)
-    ESPToggle.TextSize = 16
-    ESPToggle.Font = Enum.Font.Gotham
-    ESPToggle.Parent = Content
-    
-    local espCorner = Instance.new("UICorner")
-    espCorner.CornerRadius = UDim.new(0, 14)
-    espCorner.Parent = ESPToggle
-    
-    -- Auto Store Toggle
-    local StoreToggle = Instance.new("TextButton")
-    StoreToggle.Size = UDim2.new(1, 0, 0, 55)
-    StoreToggle.Position = UDim2.new(0, 0, 0, 155)
-    StoreToggle.BackgroundColor3 = Color3.fromRGB(45, 35, 75)
-    StoreToggle.Text = "📦 AUTO STORE: OFF"
-    StoreToggle.TextColor3 = Color3.fromRGB(200, 200, 200)
-    StoreToggle.TextSize = 16
-    StoreToggle.Font = Enum.Font.Gotham
-    StoreToggle.Parent = Content
-    
-    local storeCorner = Instance.new("UICorner")
-    storeCorner.CornerRadius = UDim.new(0, 14)
-    storeCorner.Parent = StoreToggle
-    
-    -- Speed Slider Label
-    local SpeedLabel = Instance.new("TextLabel")
-    SpeedLabel.Size = UDim2.new(1, 0, 0, 30)
-    SpeedLabel.Position = UDim2.new(0, 0, 0, 225)
-    SpeedLabel.BackgroundTransparency = 1
-    SpeedLabel.Text = "✈️ FLIGHT SPEED: " .. Settings.FlySpeed
-    SpeedLabel.TextColor3 = Color3.fromRGB(200, 180, 255)
-    SpeedLabel.TextSize = 14
-    SpeedLabel.Font = Enum.Font.Gotham
-    SpeedLabel.Parent = Content
-    
-    -- Speed Slider Bar
-    local SpeedSliderBar = Instance.new("Frame")
-    SpeedSliderBar.Size = UDim2.new(1, 0, 0, 8)
-    SpeedSliderBar.Position = UDim2.new(0, 0, 0, 260)
-    SpeedSliderBar.BackgroundColor3 = Color3.fromRGB(40, 35, 65)
-    SpeedSliderBar.BorderSizePixel = 0
-    SpeedSliderBar.Parent = Content
-    
-    local barCorner = Instance.new("UICorner")
-    barCorner.CornerRadius = UDim.new(1, 0)
-    barCorner.Parent = SpeedSliderBar
-    
-    local SpeedFill = Instance.new("Frame")
-    SpeedFill.Size = UDim2.new((Settings.FlySpeed - 50) / 450, 0, 1, 0)
-    SpeedFill.BackgroundColor3 = Color3.fromRGB(150, 80, 255)
-    SpeedFill.BorderSizePixel = 0
-    SpeedFill.Parent = SpeedSliderBar
-    
-    local fillCorner = Instance.new("UICorner")
-    fillCorner.CornerRadius = UDim.new(1, 0)
-    fillCorner.Parent = SpeedFill
-    
-    local SpeedSliderBtn = Instance.new("TextButton")
-    SpeedSliderBtn.Size = UDim2.new(0, 20, 0, 20)
-    SpeedSliderBtn.Position = UDim2.new((Settings.FlySpeed - 50) / 450, -10, -0.5, 0)
-    SpeedSliderBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 100)
-    SpeedSliderBtn.Text = ""
-    SpeedSliderBtn.Parent = SpeedSliderBar
-    
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(1, 0)
-    btnCorner.Parent = SpeedSliderBtn
-    
-    -- Speed Value Display
-    local SpeedValue = Instance.new("TextLabel")
-    SpeedValue.Size = UDim2.new(0, 60, 0, 25)
-    SpeedValue.Position = UDim2.new(1, -70, 0, 258)
-    SpeedValue.BackgroundColor3 = Color3.fromRGB(30, 25, 55)
-    SpeedValue.Text = Settings.FlySpeed
-    SpeedValue.TextColor3 = Color3.fromRGB(255, 200, 100)
-    SpeedValue.TextSize = 12
-    SpeedValue.Font = Enum.Font.GothamBold
-    SpeedValue.Parent = Content
-    
-    local speedValCorner = Instance.new("UICorner")
-    speedValCorner.CornerRadius = UDim.new(0, 6)
-    speedValCorner.Parent = SpeedValue
-    
-    -- Status Display Panel
-    local StatusFrame = Instance.new("Frame")
-    StatusFrame.Size = UDim2.new(1, 0, 0, 100)
-    StatusFrame.Position = UDim2.new(0, 0, 1, -110)
-    StatusFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    StatusFrame.BackgroundTransparency = 0.6
-    StatusFrame.BorderSizePixel = 0
-    StatusFrame.Parent = Content
-    
-    local statusCorner = Instance.new("UICorner")
-    statusCorner.CornerRadius = UDim.new(0, 14)
-    statusCorner.Parent = StatusFrame
-    
-    local StatusIcon = Instance.new("TextLabel")
-    StatusIcon.Size = UDim2.new(0, 35, 1, 0)
-    StatusIcon.BackgroundTransparency = 1
-    StatusIcon.Text = "●"
-    StatusIcon.TextColor3 = Color3.fromRGB(150, 150, 150)
-    StatusIcon.TextSize = 28
-    StatusIcon.Font = Enum.Font.Gotham
-    StatusIcon.TextXAlignment = Enum.TextXAlignment.Center
-    StatusIcon.Parent = StatusFrame
-    
-    local StatusText = Instance.new("TextLabel")
-    StatusText.Size = UDim2.new(1, -45, 0.5, 0)
-    StatusText.Position = UDim2.new(0, 45, 0, 15)
-    StatusText.BackgroundTransparency = 1
-    StatusText.Text = "STATUS: IDLE"
-    StatusText.TextColor3 = Color3.fromRGB(180, 180, 180)
-    StatusText.TextSize = 14
-    StatusText.Font = Enum.Font.GothamBold
-    StatusText.TextXAlignment = Enum.TextXAlignment.Left
-    StatusText.Parent = StatusFrame
-    
-    local TargetText = Instance.new("TextLabel")
-    TargetText.Size = UDim2.new(1, -45, 0.5, 0)
-    TargetText.Position = UDim2.new(0, 45, 0.5, 5)
-    TargetText.BackgroundTransparency = 1
-    TargetText.Text = "🎯 TARGET: -"
-    TargetText.TextColor3 = Color3.fromRGB(150, 150, 200)
-    TargetText.TextSize = 12
-    TargetText.Font = Enum.Font.Gotham
-    TargetText.TextXAlignment = Enum.TextXAlignment.Left
-    TargetText.Parent = StatusFrame
-    
-    -- Fruit Counter
-    local FruitCounter = Instance.new("TextLabel")
-    FruitCounter.Size = UDim2.new(0, 100, 0, 25)
-    FruitCounter.Position = UDim2.new(1, -110, 0, -30)
-    FruitCounter.BackgroundColor3 = Color3.fromRGB(30, 25, 55)
-    FruitCounter.Text = "🍎 0"
-    FruitCounter.TextColor3 = Color3.fromRGB(200, 200, 255)
-    FruitCounter.TextSize = 12
-    FruitCounter.Font = Enum.Font.Gotham
-    FruitCounter.Parent = Content
-    
-    local fruitCorner = Instance.new("UICorner")
-    fruitCorner.CornerRadius = UDim.new(0, 8)
-    fruitCorner.Parent = FruitCounter
-    
-    -- Anime Decorative Elements
-    local decalLeft = Instance.new("ImageLabel")
-    decalLeft.Size = UDim2.new(0, 70, 0, 70)
-    decalLeft.Position = UDim2.new(0, -20, 1, -80)
-    decalLeft.BackgroundTransparency = 1
-    decalLeft.Image = "rbxassetid://6031091206"
-    decalLeft.ImageTransparency = 0.7
-    decalLeft.Parent = MainFrame
-    
-    local decalRight = Instance.new("ImageLabel")
-    decalRight.Size = UDim2.new(0, 70, 0, 70)
-    decalRight.Position = UDim2.new(1, -50, 1, -80)
-    decalRight.BackgroundTransparency = 1
-    decalRight.Image = "rbxassetid://6031090995"
-    decalRight.ImageTransparency = 0.7
-    decalRight.Parent = MainFrame
-    
-    -- Toggle Animation
-    local minimized = false
-    local originalSize = MainFrame.Size
-    
-    MinBtn.MouseButton1Click:Connect(function()
-        minimized = not minimized
-        local goal = {}
-        if minimized then
-            goal.Size = UDim2.new(0, 480, 0, 90)
-            Content.Visible = false
-            blur.Size = 0
-        else
-            goal.Size = originalSize
-            Content.Visible = true
-            blur.Size = 12
+    table.insert(particles, {star, speedX, speedY})
+end
+
+-- Animate particles
+coroutine.wrap(function()
+    while ScreenGui.Parent do
+        for _, p in ipairs(particles) do
+            local star = p[1]
+            local x = star.Position.X.Scale + p[2] * 0.005
+            local y = star.Position.Y.Scale + p[3] * 0.005
+            if x > 1 then x = 0 end
+            if x < 0 then x = 1 end
+            if y > 1 then y = 0 end
+            if y < 0 then y = 1 end
+            star.Position = UDim2.new(x, 0, y, 0)
         end
-        local tween = TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), goal)
-        tween:Play()
+        wait(0.05)
+    end
+end)()
+
+-- Glow Border
+local glowBorder = Instance.new("ImageLabel")
+glowBorder.Size = UDim2.new(1, 12, 1, 12)
+glowBorder.Position = UDim2.new(0, -6, 0, -6)
+glowBorder.BackgroundTransparency = 1
+glowBorder.Image = "rbxassetid://5028857084"
+glowBorder.ImageColor3 = Color3.fromRGB(200, 100, 255)
+glowBorder.ImageTransparency = 0.5
+glowBorder.ScaleType = Enum.ScaleType.Slice
+glowBorder.Parent = MainFrame
+
+-- Header with Anime Logo
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 100)
+Header.BackgroundColor3 = Color3.fromRGB(25, 18, 50)
+Header.BackgroundTransparency = 0.3
+Header.BorderSizePixel = 0
+Header.Parent = MainFrame
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 24)
+headerCorner.Parent = Header
+
+-- Anime Logo Image
+local LogoImage = Instance.new("ImageLabel")
+LogoImage.Size = UDim2.new(0, 50, 0, 50)
+LogoImage.Position = UDim2.new(0, 20, 0, 25)
+LogoImage.BackgroundTransparency = 1
+LogoImage.Image = "rbxassetid://6031091206"
+LogoImage.ImageColor3 = Color3.fromRGB(255, 150, 50)
+LogoImage.Parent = Header
+
+-- Title
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -80, 0, 45)
+Title.Position = UDim2.new(0, 80, 0, 15)
+Title.BackgroundTransparency = 1
+Title.Text = "ZEON HUB"
+Title.TextColor3 = Color3.fromRGB(255, 200, 80)
+Title.TextSize = 28
+Title.Font = Enum.Font.GothamBlack
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+-- Subtitle
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Size = UDim2.new(1, -80, 0, 25)
+SubTitle.Position = UDim2.new(0, 80, 0, 55)
+SubTitle.BackgroundTransparency = 1
+SubTitle.Text = "ULTIMATE FRUIT HUNTER"
+SubTitle.TextColor3 = Color3.fromRGB(180, 150, 250)
+SubTitle.TextSize = 12
+SubTitle.Font = Enum.Font.Gotham
+SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+SubTitle.Parent = Header
+
+-- Toggle Button (Menu Open/Close)
+local ToggleMenuBtn = Instance.new("ImageButton")
+ToggleMenuBtn.Size = UDim2.new(0, 45, 0, 45)
+ToggleMenuBtn.Position = UDim2.new(1, -55, 0, 27)
+ToggleMenuBtn.BackgroundColor3 = Color3.fromRGB(80, 50, 150)
+ToggleMenuBtn.Image = "rbxassetid://6031090995"
+ToggleMenuBtn.ImageColor3 = Color3.fromRGB(255, 200, 100)
+ToggleMenuBtn.Parent = Header
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = ToggleMenuBtn
+
+-- Content Container
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Size = UDim2.new(1, -30, 1, -120)
+ContentContainer.Position = UDim2.new(0, 15, 0, 110)
+ContentContainer.BackgroundTransparency = 1
+ContentContainer.Parent = MainFrame
+
+-- Tab Buttons
+local TabButtons = Instance.new("Frame")
+TabButtons.Size = UDim2.new(1, 0, 0, 45)
+TabButtons.BackgroundTransparency = 1
+TabButtons.Parent = ContentContainer
+
+local ProfileBtn = Instance.new("TextButton")
+ProfileBtn.Size = UDim2.new(0.5, -5, 1, 0)
+ProfileBtn.Position = UDim2.new(0, 0, 0, 0)
+ProfileBtn.BackgroundColor3 = Color3.fromRGB(60, 45, 100)
+ProfileBtn.Text = "👤 PROFILE"
+ProfileBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ProfileBtn.TextSize = 14
+ProfileBtn.Font = Enum.Font.GothamBold
+ProfileBtn.Parent = TabButtons
+
+local profileCorner = Instance.new("UICorner")
+profileCorner.CornerRadius = UDim.new(0, 10)
+profileCorner.Parent = ProfileBtn
+
+local FarmBtn = Instance.new("TextButton")
+FarmBtn.Size = UDim2.new(0.5, -5, 1, 0)
+FarmBtn.Position = UDim2.new(0.5, 5, 0, 0)
+FarmBtn.BackgroundColor3 = Color3.fromRGB(45, 35, 80)
+FarmBtn.Text = "🍎 FARM"
+FarmBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+FarmBtn.TextSize = 14
+FarmBtn.Font = Enum.Font.Gotham
+FarmBtn.Parent = TabButtons
+
+local farmCorner = Instance.new("UICorner")
+farmCorner.CornerRadius = UDim.new(0, 10)
+farmCorner.Parent = FarmBtn
+
+-- Content Pages
+local ProfilePage = Instance.new("Frame")
+ProfilePage.Size = UDim2.new(1, 0, 1, -55)
+ProfilePage.Position = UDim2.new(0, 0, 0, 55)
+ProfilePage.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+ProfilePage.BackgroundTransparency = 0.3
+ProfilePage.BorderSizePixel = 0
+ProfilePage.Visible = true
+ProfilePage.Parent = ContentContainer
+
+local profilePageCorner = Instance.new("UICorner")
+profilePageCorner.CornerRadius = UDim.new(0, 16)
+profilePageCorner.Parent = ProfilePage
+
+local FarmPage = Instance.new("Frame")
+FarmPage.Size = UDim2.new(1, 0, 1, -55)
+FarmPage.Position = UDim2.new(0, 0, 0, 55)
+FarmPage.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+FarmPage.BackgroundTransparency = 0.3
+FarmPage.BorderSizePixel = 0
+FarmPage.Visible = false
+FarmPage.Parent = ContentContainer
+
+local farmPageCorner = Instance.new("UICorner")
+farmPageCorner.CornerRadius = UDim.new(0, 16)
+farmPageCorner.Parent = FarmPage
+
+-- Profile Display
+local AvatarImage = Instance.new("ImageLabel")
+AvatarImage.Size = UDim2.new(0, 80, 0, 80)
+AvatarImage.Position = UDim2.new(0.5, -40, 0, 20)
+AvatarImage.BackgroundColor3 = Color3.fromRGB(40, 30, 70)
+AvatarImage.BackgroundTransparency = 0.3
+AvatarImage.BorderSizePixel = 0
+AvatarImage.Parent = ProfilePage
+
+local avatarCorner = Instance.new("UICorner")
+avatarCorner.CornerRadius = UDim.new(1, 0)
+avatarCorner.Parent = AvatarImage
+
+local UsernameLabel = Instance.new("TextLabel")
+UsernameLabel.Size = UDim2.new(1, -20, 0, 30)
+UsernameLabel.Position = UDim2.new(0, 10, 0, 110)
+UsernameLabel.BackgroundTransparency = 1
+UsernameLabel.Text = "Loading..."
+UsernameLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+UsernameLabel.TextSize = 18
+UsernameLabel.Font = Enum.Font.GothamBold
+UsernameLabel.Parent = ProfilePage
+
+local LevelLabel = Instance.new("TextLabel")
+LevelLabel.Size = UDim2.new(1, -20, 0, 25)
+LevelLabel.Position = UDim2.new(0, 10, 0, 145)
+LevelLabel.BackgroundTransparency = 1
+LevelLabel.Text = "Level: -"
+LevelLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+LevelLabel.TextSize = 14
+LevelLabel.Font = Enum.Font.Gotham
+LevelLabel.Parent = ProfilePage
+
+local MeleeLabel = Instance.new("TextLabel")
+MeleeLabel.Size = UDim2.new(0.5, -10, 0, 25)
+MeleeLabel.Position = UDim2.new(0, 10, 0, 180)
+MeleeLabel.BackgroundTransparency = 1
+MeleeLabel.Text = "Melee: -"
+MeleeLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+MeleeLabel.TextSize = 13
+MeleeLabel.Font = Enum.Font.Gotham
+MeleeLabel.TextXAlignment = Enum.TextXAlignment.Left
+MeleeLabel.Parent = ProfilePage
+
+local FruitLabel = Instance.new("TextLabel")
+FruitLabel.Size = UDim2.new(0.5, -10, 0, 25)
+FruitLabel.Position = UDim2.new(0.5, 0, 0, 180)
+FruitLabel.BackgroundTransparency = 1
+FruitLabel.Text = "Fruit: -"
+FruitLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+FruitLabel.TextSize = 13
+FruitLabel.Font = Enum.Font.Gotham
+FruitLabel.TextXAlignment = Enum.TextXAlignment.Left
+FruitLabel.Parent = ProfilePage
+
+local GunLabel = Instance.new("TextLabel")
+GunLabel.Size = UDim2.new(0.5, -10, 0, 25)
+GunLabel.Position = UDim2.new(0, 10, 0, 210)
+GunLabel.BackgroundTransparency = 1
+GunLabel.Text = "Gun: -"
+GunLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+GunLabel.TextSize = 13
+GunLabel.Font = Enum.Font.Gotham
+GunLabel.TextXAlignment = Enum.TextXAlignment.Left
+GunLabel.Parent = ProfilePage
+
+local SwordLabel = Instance.new("TextLabel")
+SwordLabel.Size = UDim2.new(0.5, -10, 0, 25)
+SwordLabel.Position = UDim2.new(0.5, 0, 0, 210)
+SwordLabel.BackgroundTransparency = 1
+SwordLabel.Text = "Sword: -"
+SwordLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+SwordLabel.TextSize = 13
+SwordLabel.Font = Enum.Font.Gotham
+SwordLabel.TextXAlignment = Enum.TextXAlignment.Left
+SwordLabel.Parent = ProfilePage
+
+-- Farm Page Elements
+local ToggleFarmBtn = Instance.new("TextButton")
+ToggleFarmBtn.Size = UDim2.new(1, -20, 0, 55)
+ToggleFarmBtn.Position = UDim2.new(0, 10, 0, 15)
+ToggleFarmBtn.BackgroundColor3 = Color3.fromRGB(70, 50, 120)
+ToggleFarmBtn.Text = "🚀 START AUTO FARM"
+ToggleFarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleFarmBtn.TextSize = 16
+ToggleFarmBtn.Font = Enum.Font.GothamBold
+ToggleFarmBtn.Parent = FarmPage
+
+local farmBtnCorner = Instance.new("UICorner")
+farmBtnCorner.CornerRadius = UDim.new(0, 12)
+farmBtnCorner.Parent = ToggleFarmBtn
+
+local ESPToggleBtn = Instance.new("TextButton")
+ESPToggleBtn.Size = UDim2.new(1, -20, 0, 50)
+ESPToggleBtn.Position = UDim2.new(0, 10, 0, 85)
+ESPToggleBtn.BackgroundColor3 = Color3.fromRGB(55, 40, 100)
+ESPToggleBtn.Text = "👁️ ESP: ON"
+ESPToggleBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+ESPToggleBtn.TextSize = 14
+ESPToggleBtn.Font = Enum.Font.Gotham
+ESPToggleBtn.Parent = FarmPage
+
+local espBtnCorner = Instance.new("UICorner")
+espBtnCorner.CornerRadius = UDim.new(0, 12)
+espBtnCorner.Parent = ESPToggleBtn
+
+local AutoStoreBtn = Instance.new("TextButton")
+AutoStoreBtn.Size = UDim2.new(1, -20, 0, 50)
+AutoStoreBtn.Position = UDim2.new(0, 10, 0, 150)
+AutoStoreBtn.BackgroundColor3 = Color3.fromRGB(55, 40, 100)
+AutoStoreBtn.Text = "📦 AUTO STORE: OFF"
+AutoStoreBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+AutoStoreBtn.TextSize = 14
+AutoStoreBtn.Font = Enum.Font.Gotham
+AutoStoreBtn.Parent = FarmPage
+
+local storeBtnCorner = Instance.new("UICorner")
+storeBtnCorner.CornerRadius = UDim.new(0, 12)
+storeBtnCorner.Parent = AutoStoreBtn
+
+-- Speed Control
+local SpeedLabel = Instance.new("TextLabel")
+SpeedLabel.Size = UDim2.new(1, -20, 0, 25)
+SpeedLabel.Position = UDim2.new(0, 10, 0, 215)
+SpeedLabel.BackgroundTransparency = 1
+SpeedLabel.Text = "✈️ FLY SPEED: 250"
+SpeedLabel.TextColor3 = Color3.fromRGB(200, 180, 255)
+SpeedLabel.TextSize = 12
+SpeedLabel.Font = Enum.Font.Gotham
+SpeedLabel.Parent = FarmPage
+
+local SpeedSliderBar = Instance.new("Frame")
+SpeedSliderBar.Size = UDim2.new(1, -20, 0, 6)
+SpeedSliderBar.Position = UDim2.new(0, 10, 0, 245)
+SpeedSliderBar.BackgroundColor3 = Color3.fromRGB(40, 35, 70)
+SpeedSliderBar.BorderSizePixel = 0
+SpeedSliderBar.Parent = FarmPage
+
+local sliderBarCorner = Instance.new("UICorner")
+sliderBarCorner.CornerRadius = UDim.new(1, 0)
+sliderBarCorner.Parent = SpeedSliderBar
+
+local SpeedFill = Instance.new("Frame")
+SpeedFill.Size = UDim2.new(0.5, 0, 1, 0)
+SpeedFill.BackgroundColor3 = Color3.fromRGB(150, 80, 255)
+SpeedFill.BorderSizePixel = 0
+SpeedFill.Parent = SpeedSliderBar
+
+local fillCorner = Instance.new("UICorner")
+fillCorner.CornerRadius = UDim.new(1, 0)
+fillCorner.Parent = SpeedFill
+
+local SpeedSliderBtn = Instance.new("TextButton")
+SpeedSliderBtn.Size = UDim2.new(0, 16, 0, 16)
+SpeedSliderBtn.Position = UDim2.new(0.5, -8, -0.5, 0)
+SpeedSliderBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 80)
+SpeedSliderBtn.Text = ""
+SpeedSliderBtn.Parent = SpeedSliderBar
+
+local sliderBtnCorner = Instance.new("UICorner")
+sliderBtnCorner.CornerRadius = UDim.new(1, 0)
+sliderBtnCorner.Parent = SpeedSliderBtn
+
+-- Status Display
+local StatusFrame = Instance.new("Frame")
+StatusFrame.Size = UDim2.new(1, -20, 0, 65)
+StatusFrame.Position = UDim2.new(0, 10, 1, -80)
+StatusFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+StatusFrame.BackgroundTransparency = 0.5
+StatusFrame.BorderSizePixel = 0
+StatusFrame.Parent = FarmPage
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 10)
+statusCorner.Parent = StatusFrame
+
+local StatusText = Instance.new("TextLabel")
+StatusText.Size = UDim2.new(1, -10, 0.5, 0)
+StatusText.Position = UDim2.new(0, 5, 0, 8)
+StatusText.BackgroundTransparency = 1
+StatusText.Text = "STATUS: IDLE"
+StatusText.TextColor3 = Color3.fromRGB(150, 150, 150)
+StatusText.TextSize = 12
+StatusText.Font = Enum.Font.GothamBold
+StatusText.TextXAlignment = Enum.TextXAlignment.Left
+StatusText.Parent = StatusFrame
+
+local TargetStatus = Instance.new("TextLabel")
+TargetStatus.Size = UDim2.new(1, -10, 0.5, 0)
+TargetStatus.Position = UDim2.new(0, 5, 0.5, 0)
+TargetStatus.BackgroundTransparency = 1
+TargetStatus.Text = "🎯 TARGET: -"
+TargetStatus.TextColor3 = Color3.fromRGB(150, 150, 200)
+TargetStatus.TextSize = 11
+TargetStatus.Font = Enum.Font.Gotham
+TargetStatus.TextXAlignment = Enum.TextXAlignment.Left
+TargetStatus.Parent = StatusFrame
+
+-- Animation Function
+local function AnimateButton(button)
+    local originalSize = button.Size
+    local tween = TweenService:Create(button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset - 2, originalSize.Y.Scale, originalSize.Y.Offset - 2)})
+    tween:Play()
+    tween.Completed:Connect(function()
+        local tween2 = TweenService:Create(button, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = originalSize})
+        tween2:Play()
     end)
-    
-    CloseBtn.MouseButton1Click:Connect(function()
-        ScreenGui:Destroy()
-        FlyEnabled = false
+end
+
+-- Tab Switching
+local function SwitchToProfile()
+    ProfilePage.Visible = true
+    FarmPage.Visible = false
+    ProfileBtn.BackgroundColor3 = Color3.fromRGB(60, 45, 100)
+    ProfileBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ProfileBtn.Font = Enum.Font.GothamBold
+    FarmBtn.BackgroundColor3 = Color3.fromRGB(45, 35, 80)
+    FarmBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    FarmBtn.Font = Enum.Font.Gotham
+end
+
+local function SwitchToFarm()
+    ProfilePage.Visible = false
+    FarmPage.Visible = true
+    FarmBtn.BackgroundColor3 = Color3.fromRGB(60, 45, 100)
+    FarmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    FarmBtn.Font = Enum.Font.GothamBold
+    ProfileBtn.BackgroundColor3 = Color3.fromRGB(45, 35, 80)
+    ProfileBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    ProfileBtn.Font = Enum.Font.Gotham
+end
+
+ProfileBtn.MouseButton1Click:Connect(function()
+    AnimateButton(ProfileBtn)
+    SwitchToProfile()
+end)
+
+FarmBtn.MouseButton1Click:Connect(function()
+    AnimateButton(FarmBtn)
+    SwitchToFarm()
+end)
+
+-- Update Profile
+local function UpdateProfile()
+    local stats, thumbnail = GetPlayerStats()
+    UsernameLabel.Text = stats.DisplayName .. " (" .. stats.Username .. ")"
+    LevelLabel.Text = "⭐ Level: " .. stats.Level
+    MeleeLabel.Text = "👊 Melee: " .. stats.Melee
+    FruitLabel.Text = "🍎 Fruit: " .. stats.Fruit
+    GunLabel.Text = "🔫 Gun: " .. stats.Gun
+    SwordLabel.Text = "⚔️ Sword: " .. stats.Sword
+    AvatarImage.Image = thumbnail
+end
+
+coroutine.wrap(function()
+    while ScreenGui.Parent do
+        UpdateProfile()
+        wait(5)
+    end
+end)()
+
+-- Button Functions with Animation
+ToggleFarmBtn.MouseButton1Click:Connect(function()
+    AnimateButton(ToggleFarmBtn)
+    Settings.Enabled = not Settings.Enabled
+    if Settings.Enabled then
+        ToggleFarmBtn.Text = "⏹ STOP AUTO FARM"
+        ToggleFarmBtn.BackgroundColor3 = Color3.fromRGB(120, 50, 60)
+        StatusText.Text = "STATUS: HUNTING FRUITS..."
+        StatusText.TextColor3 = Color3.fromRGB(100, 255, 100)
+        targetRotation = -1
+        Notify("ZEON HUB", "Auto Farm Activated! Hunting for fruits...", 3)
+        coroutine.wrap(AutoCollectLoop)()
+    else
+        ToggleFarmBtn.Text = "🚀 START AUTO FARM"
+        ToggleFarmBtn.BackgroundColor3 = Color3.fromRGB(70, 50, 120)
+        StatusText.Text = "STATUS: IDLE"
+        StatusText.TextColor3 = Color3.fromRGB(150, 150, 150)
+        TargetStatus.Text = "🎯 TARGET: -"
+        targetRotation = -3
+        DisableFly()
+        Notify("ZEON HUB", "Auto Farm Stopped", 2)
+    end
+end)
+
+ESPToggleBtn.MouseButton1Click:Connect(function()
+    AnimateButton(ESPToggleBtn)
+    Settings.ESPEnabled = not Settings.ESPEnabled
+    if Settings.ESPEnabled then
+        ESPToggleBtn.Text = "👁️ ESP: ON"
+        ESPToggleBtn.TextColor3 = Color3.fromRGB(100, 255, 100)
+        ScanForFruits()
+        Notify("ZEON HUB", "ESP Activated", 2)
+    else
+        ESPToggleBtn.Text = "👁️ ESP: OFF"
+        ESPToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
         ClearAllESP()
-        if BodyVelocity.Parent then
-            BodyVelocity:Destroy()
-        end
-        blur:Destroy()
-    end)
-    
-    -- Button Functions
-    ToggleBtn.MouseButton1Click:Connect(function()
-        Settings.Enabled = not Settings.Enabled
-        if Settings.Enabled then
-            ToggleBtn.Text = "⏹ STOP FRUIT FINDER"
-            ToggleBtn.BackgroundColor3 = Color3.fromRGB(100, 45, 55)
-            StatusText.Text = "STATUS: SEARCHING..."
-            StatusIcon.TextColor3 = Color3.fromRGB(100, 255, 100)
-            StatusText.TextColor3 = Color3.fromRGB(100, 255, 100)
-            coroutine.wrap(FindAndCollect)()
-        else
-            ToggleBtn.Text = "⚡ START FRUIT FINDER"
-            ToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 45, 95)
-            StatusText.Text = "STATUS: IDLE"
-            StatusIcon.TextColor3 = Color3.fromRGB(150, 150, 150)
-            StatusText.TextColor3 = Color3.fromRGB(180, 180, 180)
-            TargetText.Text = "🎯 TARGET: -"
-            FlyEnabled = false
-            if BodyVelocity.Parent then
-                BodyVelocity.Velocity = Vector3.new(0, 0, 0)
-            end
-        end
-    end)
-    
-    ESPToggle.MouseButton1Click:Connect(function()
-        Settings.ESPEnabled = not Settings.ESPEnabled
-        if Settings.ESPEnabled then
-            ESPToggle.Text = "👁️ ESP: ON"
-            ESPToggle.TextColor3 = Color3.fromRGB(100, 255, 100)
-            ScanForFruits()
-        else
-            ESPToggle.Text = "👁️ ESP: OFF"
-            ESPToggle.TextColor3 = Color3.fromRGB(200, 200, 200)
-            ClearAllESP()
-        end
-    end)
-    
-    StoreToggle.MouseButton1Click:Connect(function()
-        Settings.AutoStore = not Settings.AutoStore
-        StoreToggle.Text = Settings.AutoStore and "📦 AUTO STORE: ON" or "📦 AUTO STORE: OFF"
-        StoreToggle.TextColor3 = Settings.AutoStore and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(200, 200, 200)
-    end)
-    
-    -- Slider Drag Function
-    local draggingSlider = false
-    SpeedSliderBtn.MouseButton1Down:Connect(function()
-        draggingSlider = true
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local barPos = SpeedSliderBar.AbsolutePosition.X
-            local barWidth = SpeedSliderBar.AbsoluteSize.X
-            local mouseX = input.Position.X
-            local percent = math.clamp((mouseX - barPos) / barWidth, 0, 1)
-            local newSpeed = math.floor(50 + percent * 450)
-            Settings.FlySpeed = newSpeed
-            SpeedFill.Size = UDim2.new(percent, 0, 1, 0)
-            SpeedSliderBtn.Position = UDim2.new(percent, -10, -0.5, 0)
-            SpeedLabel.Text = "✈️ FLIGHT SPEED: " .. Settings.FlySpeed
-            SpeedValue.Text = Settings.FlySpeed
-        end
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            draggingSlider = false
-        end
-    end)
-    
-    -- Drag to Move Window
-    local draggingWindow = false
-    local dragStartPos
-    local windowStartPos
-    
-    Header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            draggingWindow = true
-            dragStartPos = input.Position
-            windowStartPos = MainFrame.Position
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if draggingWindow and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - dragStartPos
-            MainFrame.Position = UDim2.new(windowStartPos.X.Scale, windowStartPos.X.Offset + delta.X, windowStartPos.Y.Scale, windowStartPos.Y.Offset + delta.Y)
-        end
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            draggingWindow = false
-        end
-    end)
-    
-    -- Update status loop
-    coroutine.wrap(function()
-        while ScreenGui.Parent do
-            if Settings.Enabled and Settings.CurrentTarget then
-                TargetText.Text = "🎯 TARGET: " .. Settings.CurrentTarget.Name
-            else
-                TargetText.Text = "🎯 TARGET: -"
-            end
-            
-            local fruits = ScanForFruits()
-            FruitCounter.Text = "🍎 " .. #fruits
-            
-            wait(0.3)
-        end
-    end)()
-    
-    blur.Size = 12
-end
+        Notify("ZEON HUB", "ESP Deactivated", 2)
+    end
+end)
 
--- Initialize
-CreateMainGUI()
+AutoStoreBtn.MouseButton1Click:Connect(function()
+    AnimateButton(AutoStoreBtn)
+    Settings.AutoStore = not Settings.AutoStore
+    AutoStoreBtn.Text = Settings.AutoStore and "📦 AUTO STORE: ON" or "📦 AUTO STORE: OFF"
+    AutoStoreBtn.TextColor3 = Settings.AutoStore and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(200, 200, 200)
+    Notify("ZEON HUB", "Auto Store: " .. (Settings.AutoStore and "ON" or "OFF"), 2)
+end)
+
+-- Slider Function
+local draggingSlider = false
+SpeedSliderBtn.MouseButton1Down:Connect(function()
+    draggingSlider = true
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if draggingSlider and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local barPos = SpeedSliderBar.AbsolutePosition.X
+        local barWidth = SpeedSliderBar.AbsoluteSize.X
+        local mouseX = input.Position.X
+        local percent = math.clamp((mouseX - barPos) / barWidth, 0, 1)
+        local newSpeed = math.floor(80 + percent * 420)
+        Settings.FlySpeed = newSpeed
+        SpeedFill.Size = UDim2.new(percent, 0, 1, 0)
+        SpeedSliderBtn.Position = UDim2.new(percent, -8, -0.5, 0)
+        SpeedLabel.Text = "✈️ FLY SPEED: " .. Settings.FlySpeed
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        draggingSlider = false
+    end
+end)
+
+-- Update status loop
+coroutine.wrap(function()
+    while ScreenGui.Parent do
+        if Settings.Enabled and Settings.CurrentTarget then
+            TargetStatus.Text = "🎯 TARGET: " .. Settings.CurrentTarget.Name
+        else
+            TargetStatus.Text = "🎯 TARGET: -"
+        end
+        
+        local fruits = ScanForFruits()
+        if #fruits > 0 and Settings.Enabled and not Settings.CurrentTarget then
+            local nearest = fruits[1]
+            TargetStatus.Text = "🎯 NEAREST: " .. nearest.Name .. " [" .. math.floor(nearest.Distance) .. "m]"
+        end
+        
+        wait(0.5)
+    end
+end)()
+
+-- Menu Toggle (Open/Close)
+local menuOpen = true
+local originalRotation = -3
+
+ToggleMenuBtn.MouseButton1Click:Connect(function()
+    AnimateButton(ToggleMenuBtn)
+    menuOpen = not menuOpen
+    if menuOpen then
+        targetRotation = -3
+        ContentContainer.Visible = true
+        ToggleMenuBtn.ImageColor3 = Color3.fromRGB(255, 200, 100)
+        Notify("ZEON HUB", "Menu Opened", 1)
+    else
+        targetRotation = 0
+        ContentContainer.Visible = false
+        ToggleMenuBtn.ImageColor3 = Color3.fromRGB(150, 100, 50)
+        Notify("ZEON HUB", "Menu Closed", 1)
+    end
+end)
+
+-- Window Drag
+local dragging = false
+local dragStart
+local startPos
+
+Header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- Initial notification
+Notify("ZEON HUB", "Script Loaded Successfully! | Menu Toggle: Anime Logo Button", 4)
+Notify("⚡ ZEON HUB", "Ready to hunt fruits! Use the menu to start farming.", 3)
+
+-- Ensure GUI stays on top
+ScreenGui.ResetOnSpawn = false
